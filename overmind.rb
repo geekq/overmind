@@ -32,16 +32,22 @@ require 'time'
 #
 class Lurker
 
-  CLEAR_AND_RESET_TERMINAL = "\ec" #\e[2J"
+  CLEAR_AND_RESET_TERMINAL = ""#\ec" #\e[2J"
+
+  attr_accessor :identity
+
+  def initialize(identity=nil)
+    @identity = identity
+  end
 
   def lurk
-    puts "\nOVERMIND IS LOADING"
+    puts "\n#{@identity}OVERMIND IS LOADING"
     extend_load_path
     memorize_files
-    puts "\nSTARTING PREPARE PHASE"
+    puts "\n#{@identity}STARTING PREPARE PHASE"
     prepare
-    puts "\nLURKING IN THE BACKGROUND"
-    puts "\nPress Ctrl-C a lot of times to interrupt, or try Ctrl-Z if the former does not work"
+    puts "\n#{@identity}LURKING IN THE BACKGROUND"
+    puts "\n#{@identity}Press Ctrl-C a lot of times to interrupt, or try Ctrl-Z if the former does not work"
     wait
     puts CLEAR_AND_RESET_TERMINAL
     puts Time.now.rfc2822
@@ -111,27 +117,40 @@ class Overmind
   IMG_FOLDER = '~/bin/autotest_images'
 
   def self.run_endless_loop(file_to_require, lurker_class, interpreter='jruby')
-    while true
-      cmd = "#{interpreter} -e 'require %q(#{file_to_require});  #{lurker_class}.new.lurk'"
-      puts "\nNew iteration, running \n#{cmd}"
-      res = ''
-      IO.popen cmd do |io|
-        io.each do |line|
-          res << line
-          puts line
-          if line == "Started\n" 
-            # char by char mode so we can better see the progress with dots
-            io.each_char do |char|
-              print char
-              STDOUT.flush
-              res << char
-              break if char == "\n"
+    `rm -f /tmp/overmind_worker_works`
+    threads = []
+    1.upto 2 do |i|
+      threads[i] = Thread.new do
+        while true
+          cmd = "#{interpreter} -I#{File.dirname(__FILE__)} -e 'require %q(#{file_to_require});  #{lurker_class}.new(%q([#{i}])).lurk; puts %q(The End)'"
+          puts "\n[#{i}]New iteration, running \n#{cmd}"
+          res = ''
+          IO.popen cmd do |io|
+            io.each do |line|
+              res << line
+              puts line
+              if line == "Started\n" 
+                # char by char mode so we can better see the progress with dots
+                io.each_char do |char|
+                  print char
+                  STDOUT.flush
+                  res << char
+                  break if char == "\n"
+                end
+              end
             end
           end
+          puts 'rm'
+          `rm -f /tmp/overmind_worker_works`
+          sleep 5
+          process_unit_test_results res
+          yield res if block_given?
         end
       end
-      process_unit_test_results res
-      yield res if block_given?
+      sleep 15
+    end
+    1.upto 2 do |i|
+      threads[i].join
     end
   end
 
