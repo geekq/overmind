@@ -32,7 +32,7 @@ require 'time'
 #
 class Lurker
 
-  CLEAR_AND_RESET_TERMINAL = ""#\ec" #\e[2J"
+  CLEAR_AND_RESET_TERMINAL = "\ec" #\e[2J"
 
   attr_accessor :identity
 
@@ -116,10 +116,10 @@ class Overmind
   EXPIRATION_IN_SECONDS = 10
   IMG_FOLDER = '~/bin/autotest_images'
 
-  def self.run_endless_loop(file_to_require, lurker_class, interpreter='jruby')
+  def self.run_endless_loop(file_to_require, lurker_class, interpreter='jruby', dual_threaded=false)
     `rm -f /tmp/overmind_worker_works`
     threads = []
-    1.upto 2 do |i|
+    0.upto(dual_threaded ? 1 : 0) do |i|
       threads[i] = Thread.new do
         while true
           cmd = "#{interpreter} -I#{File.dirname(__FILE__)} -e 'require %q(#{file_to_require});  #{lurker_class}.new(%q([#{i}])).lurk; puts %q(The End)'"
@@ -149,8 +149,8 @@ class Overmind
       end
       sleep 15
     end
-    1.upto 2 do |i|
-      threads[i].join
+    threads.each do |thread|
+      thread.join
     end
   end
 
