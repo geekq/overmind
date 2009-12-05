@@ -142,8 +142,8 @@ class Overmind
           end
           puts 'rm'
           `rm -f /tmp/overmind_worker_works`
-          sleep 5
           process_unit_test_results res
+          sleep 5
           yield res if block_given?
         end
       end
